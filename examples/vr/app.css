@@ -1,0 +1,15 @@
+body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: #111;
+}
+
+.tooltip {
+  position: fixed;
+  color: #fff;
+  left: 50%;
+  top: 50%;
+  font-size: 36px;
+  transform: translateX(-50%);
+}

@@ -6,7 +6,7 @@ const resolve = require('path').resolve;
 
 const CONFIG = {
   entry: {
-    app: resolve('./app.js')
+    app: resolve('./src/app.js')
   },
 
   devtool: 'source-map',
