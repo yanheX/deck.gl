@@ -1,5 +1,4 @@
 import React, {PureComponent} from 'react';
-import EmulatedVRDisplay from './emulated-vr-display';
 import mat4 from 'gl-mat4';
 
 const DEGREES_TO_RADIANS = Math.PI / 180;
@@ -56,7 +55,7 @@ export default class EmulatedVRController extends PureComponent {
   }
 
   render() {
-    if (this.props.vrDisplay instanceof EmulatedVRDisplay) {
+    if (this.props.vrDisplay.isEmulated) {
       return (
         <div onMouseDown={this._onMouseDown}
           onMouseMove={this._onMouseMove}

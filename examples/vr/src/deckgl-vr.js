@@ -74,7 +74,7 @@ export default class DeckGLVR extends DeckGL {
     }
 
     // Calculate viewports
-    const frameData = window.VRFrameData ? new window.VRFrameData() : {};
+    const frameData = this.props.vrDisplay.isEmulated ? {} : new window.VRFrameData();
     if (!this.props.vrDisplay.getFrameData(frameData)) {
       // Failed to get frame data
       return;

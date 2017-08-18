@@ -14,6 +14,7 @@ export default class EmulatedVRDisplay {
     this.depthFar = 1000;
     this.depthNear = 0.1;
     this.layers = [];
+    this.isEmulated = true;
 
     this.leftEyeParameters = {
       offset: [-EYE_DISTANCE / 2, 0, 0],
