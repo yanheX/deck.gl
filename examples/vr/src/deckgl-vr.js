@@ -18,13 +18,17 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 
-import DeckGL, {Viewport} from 'deck.gl';
+import {experimental, Viewport} from 'deck.gl';
 import {GL, setParameters} from 'luma.gl';
 
+const {DeckGLMultiView} = experimental;
+
 /* A flavor of the DeckGL component that renders VR using perspective viewports */
-export default class DeckGLVR extends DeckGL {
+export default class DeckGLVR extends DeckGLMultiView {
 
   componentWillReceiveProps(nextProps, nextState) {
+    super.componentWillReceiveProps(nextProps, nextState);
+
     if (this.props.vrDisplay !== nextProps.vrDisplay) {
       // We have a new VR display
       if (this.props.vrDisplay && this.state.isVRDisplayReady) {
@@ -46,6 +50,14 @@ export default class DeckGLVR extends DeckGL {
     this._initializeVRDisplay(this.props.vrDisplay, params);
   }
 
+  _updateLayers(nextProps) {
+    super._updateLayers(nextProps);
+  }
+
+  _onRenderFrame(params) {
+    super._onRenderFrame(params);
+  }
+
   _initializeVRDisplay(display, {canvas}) {
     this.setState({isVRDisplayReady: false, canvas});
 
@@ -60,76 +72,41 @@ export default class DeckGLVR extends DeckGL {
     }
   }
 
-  _updateLayers(nextProps) {
-    const {leftViewport, width, height} = nextProps;
-    const viewport = leftViewport || new Viewport({width: width / 2, height});
-
-    super._updateLayers({...nextProps, viewport});
-  }
-
-  _onRenderFrame({gl}) {
+  _getViewports() {
+    const {vrDisplay, mapState, width, height} = this.props;
     const {isVRDisplayReady} = this.state;
+
     if (!isVRDisplayReady) {
-      return;
+      return [new Viewport(mapState)];
     }
 
     // Calculate viewports
-    const frameData = this.props.vrDisplay.isEmulated ? {} : new window.VRFrameData();
-    if (!this.props.vrDisplay.getFrameData(frameData)) {
+    const frameData = vrDisplay.isEmulated ? {} : new window.VRFrameData();
+    if (!vrDisplay.getFrameData(frameData)) {
       // Failed to get frame data
-      return;
+      return [new Viewport(mapState)];
     }
 
-    const leftViewport = new Viewport({
-      width: this.props.width / 2,
-      height: this.props.height,
-      // Description
-      viewMatrix: frameData.leftViewMatrix,
-      projectionMatrix: frameData.leftProjectionMatrix
-    });
-
-    const rightViewport = new Viewport({
-      width: this.props.width / 2,
-      height: this.props.height,
-      // Description
-      viewMatrix: frameData.rightViewMatrix,
-      projectionMatrix: frameData.rightProjectionMatrix
-    });
-
-    // UpdateLayers
-    this._updateLayers({...this.props, leftViewport, rightViewport});
-
-    // clear depth and color buffers
-    gl.clear(GL.COLOR_BUFFER_BIT | GL.DEPTH_BUFFER_BIT);
-
-    this.effectManager.preDraw();
-
-    // render left viewport
-    const {width, height} = gl.canvas;
-    setParameters(gl, {
-      viewport: [0, 0, width / 2, height]
-    });
-    this.layerManager.setViewport(leftViewport).drawLayers({pass: 'left viewport'});
-
-    // render right viewport
-    setParameters(gl, {
-      viewport: [width / 2, 0, width / 2, height]
-    });
-    this.layerManager.setViewport(rightViewport).drawLayers({pass: 'right viewport'});
-
-    this.effectManager.draw();
-
-    this.props.vrDisplay.submitFrame();
-
-    // Picking
-    if (this.props.onLayerHover) {
-      // Arbitrary gaze location
-      const x = this.props.width * 2 / 3;
-      const y = this.props.height / 2;
-
-      const info = this.queryObject({x, y, radius: this.props.pickingRadius});
-      this.props.onLayerHover(info);
-    }
+    return [
+      // Left viewport
+      new Viewport({
+        ...mapState,
+        x: 0,
+        width: width / 2,
+        height,
+        zoom: null,
+        viewMatrix: frameData.leftViewMatrix
+      }),
+      // Right viewport
+      new Viewport({
+        ...mapState,
+        x: width / 2,
+        width: width / 2,
+        height,
+        zoom: null,
+        viewMatrix: frameData.rightViewMatrix
+      })
+    ];    
   }
 
 }

@@ -1,33 +1,28 @@
 /* global document,navigator */
 import React, {Component} from 'react';
 import {render} from 'react-dom';
-import {PointCloudLayer, COORDINATE_SYSTEM} from 'deck.gl';
-import DeckGLVR from './deckgl-vr';
+import {PolygonLayer, Viewport} from 'deck.gl';
 import EmulatedVRController from './emulated-vr-controller';
 import EmulatedVRDisplay from './emulated-vr-display';
 
-import loadData from './data-loader';
-import vec3_normalize from 'gl-vec3/normalize';
+import DeckGLVR from './deckgl-vr';
 
-const getPosition = ({x, y, z}) => [x, z, y];
+import {json as requestJson} from 'd3-request';
 
-const getNormal = ({vx, vy, vz}) => {
-  const n = vec3_normalize([], [vx, vz, vy]);
-  return n.length === 0 ? [0, 0, 1] : n;
+
+// Source data CSV
+const DATA_URL = {
+  BUILDINGS: 'https://raw.githubusercontent.com/uber-common/deck.gl-data/master/examples/trips/buildings.json',  // eslint-disable-line
+  TRIPS: 'https://raw.githubusercontent.com/uber-common/deck.gl-data/master/examples/trips/trips.json'  // eslint-disable-line
 };
 
-const getColor = ({absmag, ci}) => {
-  // absmag { max: 19.629, min: -16.68 }
-  // ci { max: 5.46, min: -0.4 }
-
-  const l = (absmag + 18) / 40 + 0.5;
-  const b = (3 - ci) / 4;
-  return [
-    255 * (1 - b),
-    255,
-    255 * b,
-    255 * l
-  ];
+const LIGHT_SETTINGS = {
+  lightsPosition: [-74.05, 40.7, 8000, -73.5, 41, 5000],
+  ambientRatio: 0.05,
+  diffuseRatio: 0.6,
+  specularRatio: 0.8,
+  lightsStrength: [10.0, 5.0, 0.0, 0.0],
+  numberOfLights: 2
 };
 
 class Root extends Component {
@@ -35,15 +30,25 @@ class Root extends Component {
   constructor(props) {
     super(props);
     this.state = {
+      mapState: {
+        longitude: -74,
+        latitude: 40.714,
+        fovy: 75, // Field of view covered by camera
+        focalDistance: 10
+      },
       // Fallback display parameters. Only used if no VR headset is present.
       vrDisplay: new EmulatedVRDisplay(),
-      data: null
+      buildings: null
     };
-    this._onHover = this._onHover.bind(this);
   }
 
   componentDidMount() {
-    loadData(data => this.setState({data}));
+    
+    requestJson(DATA_URL.BUILDINGS, (error, response) => {
+      if (!error) {
+        this.setState({buildings: response});
+      }
+    });
 
     // Get VR displays
     if (navigator && navigator.getVRDisplays) {
@@ -57,54 +62,36 @@ class Root extends Component {
     }
   }
 
-  _onHover(info) {
-    const hoveredStarName = info && info.object.proper;
-    if (this.state.hoveredStarName !== hoveredStarName) {
-      this.setState({hoveredStarName});
-    }
-  }
-
-  _renderHoveredItem({width, height}) {
-    const {hoveredStarName} = this.state;
-
-    if (!hoveredStarName) {
-      return null;
-    }
-
-    return <div className="tooltip">{hoveredStarName}</div>
-  }
-
   render() {
-    const {vrDisplay, data} = this.state;
+    const {vrDisplay, mapState, buildings, trips} = this.state;
 
-    if (!data) {
-      return null;
-    }
+    const layers = [
+      buildings && new PolygonLayer({
+        id: 'buildings',
+        data: buildings,
+        extruded: true,
+        wireframe: false,
+        fp64: true,
+        opacity: 0.7,
+        getPolygon: f => f.polygon,
+        getElevation: f => f.height,
+        getFillColor: f => [74, 80, 87],
+        lightSettings: LIGHT_SETTINGS
+      })
+    ];
+
     const {renderWidth, renderHeight} = vrDisplay.getEyeParameters();
     const width = renderWidth * 2;
     const height = renderHeight;
-
-    const pointCloudLayer = new PointCloudLayer({
-      data,
-      pickable: true,
-      projectionMode: COORDINATE_SYSTEM.IDENTITY,
-      getPosition,
-      getNormal,
-      getColor,
-      opacity: 1,
-      radiusPixels: 100
-    });
 
     return (
       <EmulatedVRController vrDisplay={vrDisplay} width={width} height={height}>
         <DeckGLVR
           width={width}
           height={height}
-          pickingRadius={50}
+          mapState={mapState}
           vrDisplay={vrDisplay}
-          layers={[ pointCloudLayer ]}
-          onLayerHover={this._onHover} />
-        { this._renderHoveredItem({width, height}) }
+          layers={layers} />
       </EmulatedVRController>
     );
   }

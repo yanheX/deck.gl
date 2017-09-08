@@ -1,5 +1,6 @@
 import React, {PureComponent} from 'react';
-import mat4 from 'gl-mat4';
+import {Matrix4, experimental} from 'math.gl';
+const {SphericalCoordinates} = experimental;
 
 const DEGREES_TO_RADIANS = Math.PI / 180;
 /**
@@ -16,8 +17,33 @@ export default class EmulatedVRController extends PureComponent {
     this._onMouseUp = this._onMouseUp.bind(this);
 
     this._isDragging = false;
-    this._rotationX = 0;
-    this._rotationY = 0;
+
+    this.pitch = 90;
+    this.bearing = 0;
+    this.eye = [0, 0, 0];
+    this.up = [0, 0, 1];
+    this.position = [0, 0, -150];
+
+    this._updateVRDisplay(props.vrDisplay);
+  }
+
+  componentWillReceiveProps(nextProps) {
+    if (nextProps.vrDisplay !== this.props.vrDisplay) {
+      this._updateVRDisplay(nextProps.vrDisplay);
+    }
+  }
+
+  _updateVRDisplay(vrDisplay) {
+    if (vrDisplay.isEmulated) {
+      const spherical = new SphericalCoordinates({bearing: this.bearing, pitch: this.pitch});
+      const direction = spherical.toVector3().normalize();
+
+      const viewMatrix = new Matrix4()
+        .lookAt({eye: this.eye, center: direction.negate(), up: this.up})
+        .translate(this.position);
+
+      vrDisplay.poseMatrix = viewMatrix;
+    }
   }
 
   _onMouseDown(evt) {
@@ -28,22 +54,19 @@ export default class EmulatedVRController extends PureComponent {
 
   _onMouseMove(evt) {
     if (this._isDragging) {
-      const {vrDisplay, width, height} = this.props;
+      const {width, height} = this.props;
 
-      this._rotationY += (evt.clientX - this._lastX) / width * 180;
-      this._rotationX += (evt.clientY - this._lastY) / height * 180;
+      this.bearing += (evt.clientX - this._lastX) / width * 180;
+      this.pitch += (evt.clientY - this._lastY) / height * 180;
 
-      if (this._rotationX > 89) {
-        this._rotationX = 89;
+      if (this.pitch > 180) {
+        this.pitch = 180;
       }
-      if (this._rotationX < -89) {
-        this._rotationX = -89;
+      if (this.pitch < 0) {
+        this.pitch = 0;
       }
-      const poseMatrix = mat4.create();
-      mat4.rotateY(poseMatrix, poseMatrix, this._rotationY * DEGREES_TO_RADIANS);
-      mat4.rotateX(poseMatrix, poseMatrix, this._rotationX * DEGREES_TO_RADIANS);
 
-      vrDisplay.poseMatrix = poseMatrix;
+      this._updateVRDisplay(this.props.vrDisplay);
 
       this._lastX = evt.clientX;
       this._lastY = evt.clientY;
@@ -55,15 +78,12 @@ export default class EmulatedVRController extends PureComponent {
   }
 
   render() {
-    if (this.props.vrDisplay.isEmulated) {
-      return (
-        <div onMouseDown={this._onMouseDown}
-          onMouseMove={this._onMouseMove}
-          onMouseUp={this._onMouseUp} >
-          {this.props.children}
-        </div>
-      );
-    }
-    return <div>{this.props.children}</div>;
+    return (
+      <div onMouseDown={this._onMouseDown}
+        onMouseMove={this._onMouseMove}
+        onMouseUp={this._onMouseUp} >
+        {this.props.children}
+      </div>
+    );
   }
 }

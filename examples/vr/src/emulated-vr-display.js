@@ -1,5 +1,5 @@
 /* global window */
-import mat4 from 'gl-mat4';
+import {Matrix4} from 'math.gl';
 
 const DEGREES_TO_RADIANS = Math.PI / 180;
 const EYE_DISTANCE = 0.08;
@@ -35,7 +35,7 @@ export default class EmulatedVRDisplay {
       }
     };
 
-    this.poseMatrix = mat4.create();
+    this.poseMatrix = new Matrix4();
 
     this._leftEyeMatrix = this._getEyeMatrix(this.leftEyeParameters);
     this._rightEyeMatrix = this._getEyeMatrix(this.rightEyeParameters);
@@ -60,17 +60,18 @@ export default class EmulatedVRDisplay {
     vrFrameData.timestamp = Date.now();
 
     const viewport = this._getViewportSize();
-    const projectionMatrix = mat4.perspective([],
-      (FOV_DEGREES_X_MIN + FOV_DEGREES_X_MAX) * DEGREES_TO_RADIANS,
-      viewport.renderWidth / viewport.renderHeight,
-      this.depthNear,
-      this.depthFar);
+    const projectionMatrix = new Matrix4().perspective({
+      fov: (FOV_DEGREES_X_MIN + FOV_DEGREES_X_MAX) * DEGREES_TO_RADIANS,
+      aspect: viewport.renderWidth / viewport.renderHeight,
+      near: this.depthNear,
+      far: this.depthFar
+    });
 
-    vrFrameData.leftViewMatrix = mat4.multiply([], this.poseMatrix, this._leftEyeMatrix);
-    vrFrameData.leftProjectionMatrix = mat4.multiply([], projectionMatrix, vrFrameData.leftViewMatrix);
+    vrFrameData.leftViewMatrix = this.poseMatrix.clone().multiplyRight(this._leftEyeMatrix);
+    vrFrameData.leftProjectionMatrix = projectionMatrix.clone().multiplyRight(vrFrameData.leftViewMatrix);
 
-    vrFrameData.rightViewMatrix = mat4.multiply([], this.poseMatrix, this._rightEyeMatrix);
-    vrFrameData.rightProjectionMatrix = mat4.multiply([], projectionMatrix, vrFrameData.rightViewMatrix);
+    vrFrameData.rightViewMatrix = this.poseMatrix.clone().multiplyRight(this._rightEyeMatrix);
+    vrFrameData.rightProjectionMatrix = projectionMatrix.clone().multiplyRight(vrFrameData.rightViewMatrix);
 
     return true;
   }
@@ -95,12 +96,12 @@ export default class EmulatedVRDisplay {
   }
 
   _getEyeMatrix({offset, fieldOfView}) {
-    const matrix = mat4.create();
+    const matrix = new Matrix4();
     // rotate
     const gazeDir = -(fieldOfView.leftDegrees - fieldOfView.rightDegrees) * DEGREES_TO_RADIANS;
-    mat4.rotateY(matrix, matrix, gazeDir);
+    matrix.rotateZ(gazeDir);
     // offset
-    mat4.translate(matrix, matrix, offset);
+    matrix.translate(offset);
 
     return matrix;
   }
