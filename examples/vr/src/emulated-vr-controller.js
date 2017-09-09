@@ -22,25 +22,23 @@ export default class EmulatedVRController extends PureComponent {
     this.bearing = 0;
     this.eye = [0, 0, 0];
     this.up = [0, 0, 1];
-    this.position = [0, 0, -150];
 
-    this._updateVRDisplay(props.vrDisplay);
+    this._updateVRDisplay(props);
   }
 
   componentWillReceiveProps(nextProps) {
-    if (nextProps.vrDisplay !== this.props.vrDisplay) {
-      this._updateVRDisplay(nextProps.vrDisplay);
-    }
+    this._updateVRDisplay(nextProps);
   }
 
-  _updateVRDisplay(vrDisplay) {
+  _updateVRDisplay({vrDisplay, mapState}) {
     if (vrDisplay.isEmulated) {
-      const spherical = new SphericalCoordinates({bearing: this.bearing, pitch: this.pitch});
+      const spherical = new SphericalCoordinates({
+        bearing: this.bearing + (-90 - mapState.heading),
+        pitch: this.pitch
+      });
       const direction = spherical.toVector3().normalize();
 
-      const viewMatrix = new Matrix4()
-        .lookAt({eye: this.eye, center: direction.negate(), up: this.up})
-        .translate(this.position);
+      const viewMatrix = new Matrix4().lookAt({eye: this.eye, center: direction.negate(), up: this.up});
 
       vrDisplay.poseMatrix = viewMatrix;
     }
@@ -66,7 +64,7 @@ export default class EmulatedVRController extends PureComponent {
         this.pitch = 0;
       }
 
-      this._updateVRDisplay(this.props.vrDisplay);
+      this._updateVRDisplay(this.props);
 
       this._lastX = evt.clientX;
       this._lastY = evt.clientY;

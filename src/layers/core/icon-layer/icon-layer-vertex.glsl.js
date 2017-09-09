@@ -57,12 +57,13 @@ void main(void) {
 
   // scale and rotate vertex in "pixel" value and convert back to fraction in clipspace
   vec2 pixelOffset = positions / 2.0 * iconSize + instanceOffsets;
-  pixelOffset = rotate_by_angle(pixelOffset, instanceAngles) / viewportSize * sizeScale *
+  pixelOffset = rotate_by_angle(pixelOffset, instanceAngles) * sizeScale *
     instanceScale * devicePixelRatio;
   pixelOffset.y *= -1.0;
 
   vec3 center = project_position(instancePositions);
-  gl_Position = project_to_clipspace(vec4(center, 1.0)) + vec4(pixelOffset, 0.0, 0.0);
+  gl_Position = project_to_clipspace(vec4(center, 1.0));
+  gl_Position += project_pixel_to_clipspace(pixelOffset);
 
   vTextureCoords = mix(
     instanceIconFrames.xy,

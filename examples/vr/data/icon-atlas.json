@@ -1,0 +1,130 @@
+{
+  "restaurant": {
+    "x": 0,
+    "y": 0,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "cafe": {
+    "x": 128,
+    "y": 0,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "fast_food": {
+    "x": 256,
+    "y": 0,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "bicycle_rental": {
+    "x": 384,
+    "y": 0,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "school": {
+    "x": 0,
+    "y": 128,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "bank": {
+    "x": 128,
+    "y": 128,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "clothes": {
+    "x": 256,
+    "y": 128,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "embassy": {
+    "x": 384,
+    "y": 128,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "bar": {
+    "x": 0,
+    "y": 256,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "pharmacy": {
+    "x": 128,
+    "y": 256,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "hotel": {
+    "x": 256,
+    "y": 256,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "convenience": {
+    "x": 384,
+    "y": 256,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "park": {
+    "x": 0,
+    "y": 384,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "supermarket": {
+    "x": 128,
+    "y": 384,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "pub": {
+    "x": 256,
+    "y": 384,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  },
+  "marker": {
+    "x": 384,
+    "y": 384,
+    "width": 128,
+    "height": 128,
+    "anchorY": 128,
+    "mask": true
+  }
+}

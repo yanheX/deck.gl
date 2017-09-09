@@ -44,7 +44,8 @@ export default class DeckGLVR extends DeckGLMultiView {
 
     setParameters(params.gl, {
       depthTest: true,
-      depthFunc: GL.LEQUAL
+      depthFunc: GL.LEQUAL,
+      polygonOffsetFill: false
     });
 
     this._initializeVRDisplay(this.props.vrDisplay, params);

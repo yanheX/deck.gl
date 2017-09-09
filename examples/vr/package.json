@@ -4,6 +4,7 @@
     "start": "webpack-dev-server --progress --hot --port 3000 --open"
   },
   "dependencies": {
+    "@tweenjs/tween.js": "^17.1.0",
     "d3-request": "^1.0.5",
     "deck.gl": ">=4.2.0",
     "luma.gl": "^4.0.0",
