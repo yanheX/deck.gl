@@ -11,7 +11,8 @@ const MAPBOX_TOKEN = process.env.MapboxAccessToken; // eslint-disable-line
 const MAPBOX_STYLE =
   'https://rivulet-zhang.github.io/dataRepo/mapbox/style/map-style-dark-v9-no-labels.json';
 // sample data
-const DATA_URL = 'https://rivulet-zhang.github.io/dataRepo/text-layer/hashtagsOneDayWithTime.json';
+const DATA_URL = './data/hashtags.json';
+// const DATA_URL = 'https://rivulet-zhang.github.io/dataRepo/text-layer/hashtagsOneDayWithTime.json';
 
 class Root extends Component {
   constructor(props) {
@@ -63,7 +64,7 @@ class Root extends Component {
         onViewportChange={this._onViewportChange}
         mapboxApiAccessToken={MAPBOX_TOKEN}
       >
-        <DeckGLOverlay viewport={viewport} data={data} isPlaying={true} time={0} />
+        <DeckGLOverlay viewport={viewport} data={data} isPlaying={true} time={60000} />
       </MapGL>
     );
   }

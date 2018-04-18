@@ -9,6 +9,15 @@ const SECONDS_PER_SLICE = SECONDS_PER_DAY / TOTAL_SLICES;
 const TIME_WINDOW = 200;
 const INVISIBLE_COLOR = [0, 0, 0, 0];
 const ANIMATION_SPEED = 40;
+const MAX_OFFSET_RADIUS_PIXELS = 56;
+
+function formatTime(timeOfDay) {
+  const hours = Math.floor(timeOfDay / 3600);
+  const minutes = Math.floor(timeOfDay / 60) % 60;
+  const seconds = timeOfDay % 60;
+  const pad = x => x.toFixed(0).padStart(2, '0');
+  return `${pad(hours)}:${pad(minutes)}:${pad(seconds)}`;
+}
 
 export default class DeckGLOverlay extends Component {
   static get defaultViewport() {
@@ -57,16 +66,16 @@ export default class DeckGLOverlay extends Component {
     this._stopAnimation();
   }
 
+  _startAnimation() {
+    this._stopAnimation();
+    this._startTime = Date.now();
+    this._animation = window.requestAnimationFrame(this._animate);
+  }
+
   _animate() {
     const deltaTime = (Date.now() - this._startTime) / 1000 * ANIMATION_SPEED;
     const currentTime = (deltaTime + this.props.time) % SECONDS_PER_DAY;
     this.setState({currentTime});
-    this._animation = window.requestAnimationFrame(this._animate);
-  }
-
-  _startAnimation() {
-    this._stopAnimation();
-    this._startTime = Date.now();
     this._animation = window.requestAnimationFrame(this._animate);
   }
 
@@ -104,10 +113,42 @@ export default class DeckGLOverlay extends Component {
     return dataSlices;
   }
 
-  /**
-   * Get the data slice at the current timestamp
-   */
-  _getCurrentData(dataSlices, currentTime) {
+  _getSize(currentTime, d) {
+    const r = 1 - (currentTime - d.timeOfDay) / TIME_WINDOW;
+    if (r <= 0 || r > 1) {
+      return 0;
+    }
+    return r * r;
+  }
+
+  _getColor(currentTime, d) {
+    const r = 1 - (currentTime - d.timeOfDay) / TIME_WINDOW;
+    if (r <= 0 || r > 1) {
+      return INVISIBLE_COLOR;
+    }
+    return [255 * r, 200, (1 - r) * 255, 255 * r];
+  }
+
+  // tweets are concentrated by big cities
+  // apply an arbitrary pixel offset to each tag to reduce overlap
+  _getRandomOffset(d) {
+    const {text} = d;
+    const p = text.length * 47 +
+      text.charCodeAt(0) * 53 +
+      text.charCodeAt(text.length - 1) * 91;
+    const p1 = (p % 107) / 107;
+    const p2 = (p % 113) / 113;
+
+    const a = p1 * Math.PI * 2;
+    const r = (1 - p2 * p2) * MAX_OFFSET_RADIUS_PIXELS;
+
+    return [r * Math.cos(a), r * Math.sin(a)];
+  }
+
+  render() {
+    const {viewport} = this.props;
+    const {dataSlices, currentTime} = this.state;
+
     if (!dataSlices) {
       return null;
     }
@@ -115,34 +156,15 @@ export default class DeckGLOverlay extends Component {
     const sliceIndex = Math.floor(currentTime / SECONDS_PER_SLICE);
     const data = dataSlices[sliceIndex];
 
-    const fromTime = currentTime - TIME_WINDOW;
-
-    // pre-calculate the scaler inside the current time window
-    data.forEach(d => {
-      const time = d.timeOfDay;
-      if (time <= fromTime || time >= currentTime) {
-        d.r = 0;
-      } else {
-        d.r = Math.pow((time - fromTime) / TIME_WINDOW, 2);
-      }
-    });
-
-    return data;
-  }
-
-  render() {
-    const {viewport} = this.props;
-    const {dataSlices, currentTime} = this.state;
-    const data = this._getCurrentData(dataSlices, currentTime);
-
     const layers = [
       new TextLayer({
         id: 'hashtag-layer',
         data,
         sizeScale: 48,
-        getColor: d => (d.r ? [255 * d.r, 200, (1 - d.r) * 255, 255 * d.r] : INVISIBLE_COLOR),
-        getSize: d => d.r,
+        getColor: this._getColor.bind(null, currentTime),
+        getSize: this._getSize.bind(null, currentTime),
         getPosition: d => d.coordinates,
+        getPixelOffset: this._getRandomOffset,
         updateTriggers: {
           // update color and size iff currentTime changes
           getColor: currentTime,
@@ -151,6 +173,8 @@ export default class DeckGLOverlay extends Component {
       })
     ];
 
-    return <DeckGL {...viewport} layers={layers} />;
+    return (<DeckGL {...viewport} layers={layers} >
+        <h1>{formatTime(currentTime)}</h1>
+      </DeckGL>);
   }
 }
