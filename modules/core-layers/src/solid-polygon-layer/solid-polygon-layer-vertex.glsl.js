@@ -22,6 +22,7 @@ export default `\
 #define SHADER_NAME solid-polygon-layer-vertex-shader
 
 attribute vec2 vertexPositions;
+attribute float endFlags;
 attribute vec3 positions;
 attribute vec2 positions64xyLow;
 attribute vec3 nextPositions;
@@ -36,6 +37,7 @@ uniform float elevationScale;
 uniform float opacity;
 
 varying vec4 vColor;
+varying float vDiscard;
 
 void main(void) {
   vec3 pos;
@@ -45,9 +47,11 @@ void main(void) {
   if (isSideVertex > 0.5) {
     pos = mix(positions, nextPositions, vertexPositions.x);
     pos64xyLow = mix(positions64xyLow, nextPositions64xyLow, vertexPositions.x);
+    vDiscard = endFlags;
   } else {
     pos = positions;
     pos64xyLow = positions64xyLow;
+    vDiscard = 0.0;
   }
   if (extruded > 0.5) {
     pos.z += elevations * vertexPositions.y;

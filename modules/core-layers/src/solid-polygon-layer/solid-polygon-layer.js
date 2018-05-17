@@ -85,38 +85,41 @@ const SIDE_WIRE_POSITIONS = new Float32Array([
 ]);
 
 // Model types
-const ATTRIBUTE_OVERRIDES = {
-  TOP: null,
-  SIDE: {instanced: 1},
-  WIRE: {instanced: 1}
-};
+const INSTANCED = {instanced: 1};
 
 const ATTRIBUTE_MAPS = {
   TOP: {
-    indices: 'indices',
-    positions: 'positions',
-    positions64xyLow: 'positions64xyLow',
-    elevations: 'elevations',
-    colors: 'fillColors',
-    pickingColors: 'pickingColors'
+    indices: null,
+    positions: null,
+    positions64xyLow: null,
+    endFlags: null,
+    elevations: null,
+    colors: {source: 'fillColors'},
+    pickingColors: null
   },
   SIDE: {
-    positions: 'positions',
-    positions64xyLow: 'positions64xyLow',
-    nextPositions: 'nextPositions',
-    nextPositions64xyLow: 'nextPositions64xyLow',
-    elevations: 'elevations',
-    colors: 'fillColors',
-    pickingColors: 'pickingColors'
+    positions: INSTANCED,
+    positions64xyLow: INSTANCED,
+    endFlags: INSTANCED,
+    // offset is 1 vertex * 3 floats * 4 bytes per float
+    nextPositions: {source: 'positions', offset: 12, instanced: 1},
+    // offset is 1 vertex * 2 floats * 4 bytes per float
+    nextPositions64xyLow: {source: 'positions64xyLow', offset: 8, instanced: 1},
+    elevations: INSTANCED,
+    colors: {source: 'fillColors', instanced: 1},
+    pickingColors: INSTANCED
   },
   WIRE: {
-    positions: 'positions',
-    positions64xyLow: 'positions64xyLow',
-    nextPositions: 'nextPositions',
-    nextPositions64xyLow: 'nextPositions64xyLow',
-    elevations: 'elevations',
-    colors: 'lineColors',
-    pickingColors: 'pickingColors'
+    positions: INSTANCED,
+    positions64xyLow: INSTANCED,
+    endFlags: INSTANCED,
+    // offset is 1 vertex * 3 floats * 4 bytes per float
+    nextPositions: {source: 'positions', offset: 12, instanced: 1},
+    // offset is 1 vertex * 2 floats * 4 bytes per float
+    nextPositions64xyLow: {source: 'positions64xyLow', offset: 8, instanced: 1},
+    elevations: INSTANCED,
+    colors: {source: 'lineColors', instanced: 1},
+    pickingColors: INSTANCED
   }
 };
 
@@ -144,14 +147,8 @@ export default class SolidPolygonLayer extends Layer {
         update: this.calculatePositions,
         noAlloc
       },
-      positions64xyLow: {size: 2, accessor: 'fp64', update: this.calculatePositionsLow},
-      nextPositions: {
-        size: 3,
-        accessor: ['extruded', 'fp64'],
-        update: this.calculateNextPositions,
-        noAlloc
-      },
-      nextPositions64xyLow: {size: 2, accessor: 'fp64', update: this.calculateNextPositionsLow},
+      positions64xyLow: {size: 2, accessor: 'fp64', update: this.calculatePositionsLow, noAlloc},
+      endFlags: {size: 1, update: this.calculateEndFlags, noAlloc},
       elevations: {
         size: 1,
         accessor: ['extruded', 'getElevation'],
@@ -299,10 +296,11 @@ export default class SolidPolygonLayer extends Layer {
       }
 
       const attributeMap = ATTRIBUTE_MAPS[modelName];
-      const attributeOverride = ATTRIBUTE_OVERRIDES[modelName];
       const newAttributes = {};
       for (const attributeName in attributeMap) {
-        const attribute = attributes[attributeMap[attributeName]];
+        const attributeOverride = attributeMap[attributeName];
+        const sourceName = attributeOverride && attributeOverride.source || attributeName;
+        const attribute = attributes[sourceName];
 
         if (attribute) {
           newAttributes[attributeName] = attributeOverride
@@ -396,7 +394,8 @@ export default class SolidPolygonLayer extends Layer {
 
   calculatePositions(attribute) {
     attribute.value = this.state.polygonTesselator.positions();
-    const numInstances = attribute.value.length / attribute.size;
+    // remove one for the offset
+    const numInstances = attribute.value.length / attribute.size - 1;
     this.setState({numInstances});
   }
   calculatePositionsLow(attribute) {
@@ -411,19 +410,8 @@ export default class SolidPolygonLayer extends Layer {
     attribute.value = this.state.polygonTesselator.positions64xyLow();
   }
 
-  calculateNextPositions(attribute) {
-    attribute.value = this.state.polygonTesselator.nextPositions();
-  }
-  calculateNextPositionsLow(attribute) {
-    const isFP64 = enable64bitSupport(this.props);
-    attribute.isGeneric = !isFP64;
-
-    if (!isFP64) {
-      attribute.value = new Float32Array(2);
-      return;
-    }
-
-    attribute.value = this.state.polygonTesselator.nextPositions64xyLow();
+  calculateEndFlags(attribute) {
+    attribute.value = this.state.polygonTesselator.endFlags();
   }
 
   calculateElevations(attribute) {

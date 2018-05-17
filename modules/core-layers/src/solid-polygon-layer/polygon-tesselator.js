@@ -64,13 +64,11 @@ export class PolygonTesselator {
     const {attributes, polygons, pointCount} = this;
 
     attributes.positions = attributes.positions || new Float32Array(pointCount * 3);
-    attributes.nextPositions = attributes.nextPositions || new Float32Array(pointCount * 3);
+    attributes.endFlags = attributes.endFlags || new Float32Array(pointCount);
 
     if (fp64) {
       // We only need x, y component
       attributes.positions64xyLow = attributes.positions64xyLow || new Float32Array(pointCount * 2);
-      attributes.nextPositions64xyLow =
-        attributes.nextPositions64xyLow || new Float32Array(pointCount * 2);
     }
 
     updatePositions({cache: attributes, polygons, extruded, fp64});
@@ -88,11 +86,8 @@ export class PolygonTesselator {
     return this.attributes.positions64xyLow;
   }
 
-  nextPositions() {
-    return this.attributes.nextPositions;
-  }
-  nextPositions64xyLow() {
-    return this.attributes.nextPositions64xyLow;
+  endFlags() {
+    return this.attributes.endFlags;
   }
 
   elevations({key = 'elevations', getElevation = x => 100} = {}) {
@@ -157,7 +152,7 @@ function calculateIndices({polygons, IndexType = Uint32Array}) {
 }
 
 function updatePositions({
-  cache: {positions, positions64xyLow, nextPositions, nextPositions64xyLow},
+  cache: {positions, positions64xyLow, endFlags},
   polygons,
   extruded,
   fp64
@@ -167,64 +162,30 @@ function updatePositions({
   let nextI = 0;
   let startVertex = null;
 
-  const pushStartVertex = (x, y, z, xLow, yLow) => {
-    if (extruded) {
-      // Save first vertex for setting nextPositions at the end of the loop
-      startVertex = {x, y, z, xLow, yLow};
-    }
-  };
-
-  const popStartVertex = () => {
-    if (startVertex) {
-      nextPositions[nextI * 3] = startVertex.x;
-      nextPositions[nextI * 3 + 1] = startVertex.y;
-      nextPositions[nextI * 3 + 2] = startVertex.z;
-      if (fp64) {
-        nextPositions64xyLow[nextI * 2] = startVertex.xLow;
-        nextPositions64xyLow[nextI * 2 + 1] = startVertex.yLow;
-      }
-      nextI++;
-    }
-    startVertex = null;
-  };
-
   polygons.forEach((polygon, polygonIndex) => {
-    Polygon.forEachVertex(polygon, (vertex, vertexIndex) => {
-      // eslint-disable-line
-      const x = vertex[0];
-      const y = vertex[1];
-      const z = vertex[2] || 0;
-      let xLow;
-      let yLow;
+    polygon.forEach((loop) => {
+      loop.forEach((vertex, vertexIndex) => {
+        // eslint-disable-line
+        const x = vertex[0];
+        const y = vertex[1];
+        const z = vertex[2] || 0;
+        let xLow;
+        let yLow;
 
-      positions[i * 3] = x;
-      positions[i * 3 + 1] = y;
-      positions[i * 3 + 2] = z;
-      if (fp64) {
-        xLow = fp64LowPart(x);
-        yLow = fp64LowPart(y);
-        positions64xyLow[i * 2] = xLow;
-        positions64xyLow[i * 2 + 1] = yLow;
-      }
-      i++;
-
-      if (extruded && vertexIndex > 0) {
-        nextPositions[nextI * 3] = x;
-        nextPositions[nextI * 3 + 1] = y;
-        nextPositions[nextI * 3 + 2] = z;
+        positions[i * 3] = x;
+        positions[i * 3 + 1] = y;
+        positions[i * 3 + 2] = z;
         if (fp64) {
-          nextPositions64xyLow[nextI * 2] = xLow;
-          nextPositions64xyLow[nextI * 2 + 1] = yLow;
+          xLow = fp64LowPart(x);
+          yLow = fp64LowPart(y);
+          positions64xyLow[i * 2] = xLow;
+          positions64xyLow[i * 2 + 1] = yLow;
         }
-        nextI++;
-      }
-      if (vertexIndex === 0) {
-        popStartVertex();
-        pushStartVertex(x, y, z, xLow, yLow);
-      }
+        i++;
+      });
+      endFlags[i - 1] = 1;
     });
   });
-  popStartVertex();
 }
 
 function updateElevations({cache, polygons, pointCount, getElevation}) {

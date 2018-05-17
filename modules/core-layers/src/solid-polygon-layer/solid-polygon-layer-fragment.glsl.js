@@ -26,8 +26,13 @@ precision highp float;
 #endif
 
 varying vec4 vColor;
+varying float vDiscard;
 
 void main(void) {
+  if (vDiscard > 0.5) {
+    discard;
+  }
+
   gl_FragColor = vColor;
 
   // use highlight color if this fragment belongs to the selected object.
