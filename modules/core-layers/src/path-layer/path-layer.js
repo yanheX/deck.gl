@@ -120,7 +120,8 @@ export default class PathLayer extends Layer {
     if (geometryChanged) {
       // this.state.paths only stores point positions in each path
       const paths = props.data.map(getPath);
-      const numInstances = paths.reduce((count, path) => count + path.length + 1, 0);
+      // Each path has `length - 1` segments and 3 invalid segments due to offsetting
+      const numInstances = paths.reduce((count, path) => count + path.length + 2, 0);
 
       this.setState({paths, numInstances, needsUpdatePositions: true});
       attributeManager.invalidateAll();
