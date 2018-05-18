@@ -176,6 +176,8 @@ export default class PathLayer extends Layer {
 
     const {model} = this.state;
 
+    // Base layer sets instance count to `this.state.numInstances`
+    // We need to remove the last 3 to avoid accessing out of range vertices in offsetted attributes
     model.setInstanceCount(this.state.numInstances - 3);
 
     model.render(

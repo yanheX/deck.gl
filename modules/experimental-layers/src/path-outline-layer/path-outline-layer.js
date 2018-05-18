@@ -88,12 +88,18 @@ export default class PathOutlineLayer extends PathLayer {
       widthMaxPixels
     });
 
+    const {model} = this.state;
+
+    // Base layer sets instance count to `this.state.numInstances`
+    // We need to remove the last 3 to avoid accessing out of range vertices in offsetted attributes
+    model.setInstanceCount(this.state.numInstances - 3);
+
     // Render the outline shadowmap (based on segment z orders)
     const {outlineFramebuffer, dummyTexture} = this.state;
     outlineFramebuffer.resize();
     outlineFramebuffer.clear({color: true, depth: true});
 
-    this.state.model.updateModuleSettings(
+    model.updateModuleSettings(
       Object.assign({}, moduleParameters, {
         outlineEnabled: true,
         outlineRenderShadowmap: true,
@@ -101,7 +107,7 @@ export default class PathOutlineLayer extends PathLayer {
       })
     );
 
-    this.state.model.draw({
+    model.draw({
       uniforms: Object.assign({}, uniforms, {
         jointType: 0,
         widthScale: this.props.widthScale * 1.3
@@ -114,14 +120,14 @@ export default class PathOutlineLayer extends PathLayer {
     });
 
     // Now use the outline shadowmap to render the lines (with outlines)
-    this.state.model.updateModuleSettings(
+    model.updateModuleSettings(
       Object.assign({}, moduleParameters, {
         outlineEnabled: true,
         outlineRenderShadowmap: false,
         outlineShadowmap: outlineFramebuffer
       })
     );
-    this.state.model.draw({
+    model.draw({
       uniforms: Object.assign({}, uniforms, {
         jointType: Number(rounded),
         widthScale: this.props.widthScale
@@ -141,7 +147,7 @@ export default class PathOutlineLayer extends PathLayer {
     paths.forEach((path, index) => {
       let zLevel = getZLevel(data[index], index);
       zLevel = isNaN(zLevel) ? 0 : zLevel;
-      for (let ptIndex = 1; ptIndex < path.length; ptIndex++) {
+      for (let ptIndex = 0; ptIndex < path.length + 2; ptIndex++) {
         value[i++] = zLevel;
       }
     });
