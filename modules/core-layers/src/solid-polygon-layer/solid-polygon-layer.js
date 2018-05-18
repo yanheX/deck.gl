@@ -92,7 +92,7 @@ const ATTRIBUTE_MAPS = {
     indices: null,
     positions: null,
     positions64xyLow: null,
-    endFlags: null,
+    discardFlags: null,
     elevations: null,
     colors: {source: 'fillColors'},
     pickingColors: null
@@ -100,7 +100,7 @@ const ATTRIBUTE_MAPS = {
   SIDE: {
     positions: INSTANCED,
     positions64xyLow: INSTANCED,
-    endFlags: INSTANCED,
+    discardFlags: INSTANCED,
     // offset is 1 vertex * 3 floats * 4 bytes per float
     nextPositions: {source: 'positions', offset: 12, instanced: 1},
     // offset is 1 vertex * 2 floats * 4 bytes per float
@@ -112,7 +112,7 @@ const ATTRIBUTE_MAPS = {
   WIRE: {
     positions: INSTANCED,
     positions64xyLow: INSTANCED,
-    endFlags: INSTANCED,
+    discardFlags: INSTANCED,
     // offset is 1 vertex * 3 floats * 4 bytes per float
     nextPositions: {source: 'positions', offset: 12, instanced: 1},
     // offset is 1 vertex * 2 floats * 4 bytes per float
@@ -148,7 +148,7 @@ export default class SolidPolygonLayer extends Layer {
         noAlloc
       },
       positions64xyLow: {size: 2, accessor: 'fp64', update: this.calculatePositionsLow, noAlloc},
-      endFlags: {size: 1, update: this.calculateEndFlags, noAlloc},
+      discardFlags: {size: 1, update: this.calculateDiscardFlags, noAlloc},
       elevations: {
         size: 1,
         accessor: ['extruded', 'getElevation'],
@@ -410,8 +410,8 @@ export default class SolidPolygonLayer extends Layer {
     attribute.value = this.state.polygonTesselator.positions64xyLow();
   }
 
-  calculateEndFlags(attribute) {
-    attribute.value = this.state.polygonTesselator.endFlags();
+  calculateDiscardFlags(attribute) {
+    attribute.value = this.state.polygonTesselator.discardFlags();
   }
 
   calculateElevations(attribute) {

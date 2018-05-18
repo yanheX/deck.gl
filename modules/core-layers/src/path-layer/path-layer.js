@@ -19,7 +19,7 @@
 // THE SOFTWARE.
 
 import {COORDINATE_SYSTEM, Layer, experimental} from '@deck.gl/core';
-const {fp64LowPart, enable64bitSupport} = experimental;
+const {fillArray, fp64LowPart, enable64bitSupport} = experimental;
 import {GL, Model, Geometry} from 'luma.gl';
 
 import vs from './path-layer-vertex.glsl';
@@ -64,16 +64,9 @@ export default class PathLayer extends Layer {
     const attributeManager = this.getAttributeManager();
     /* eslint-disable max-len */
     attributeManager.addInstanced({
-      instanceStartPositions: {size: 3, update: this.calculateStartPositions},
-      instanceEndPositions: {size: 3, update: this.calculateEndPositions},
-      instanceLeftDeltas: {size: 3, update: this.calculateLeftDeltas},
-      instanceRightDeltas: {size: 3, update: this.calculateRightDeltas},
-      instanceStrokeWidths: {
-        size: 1,
-        accessor: 'getWidth',
-        update: this.calculateStrokeWidths,
-        defaultValue: 1
-      },
+      instancePositions: {size: 3, update: this.calculatePositions},
+      instanceDiscardFlags: {size: 1, update: this.calculateDiscardFlags},
+      instanceStrokeWidths: {size: 1, accessor: 'getWidth', update: this.calculateStrokeWidths},
       instanceDashArrays: {size: 2, accessor: 'getDashArray', update: this.calculateDashArrays},
       instanceColors: {
         size: 4,
@@ -94,13 +87,13 @@ export default class PathLayer extends Layer {
 
       if (props.fp64 && props.coordinateSystem === COORDINATE_SYSTEM.LNGLAT) {
         attributeManager.addInstanced({
-          instanceStartEndPositions64xyLow: {
-            size: 4,
-            update: this.calculateInstanceStartEndPositions64xyLow
+          instancePositions64xyLow: {
+            size: 2,
+            update: this.calculatePositions64xyLow
           }
         });
       } else {
-        attributeManager.remove(['instanceStartEndPositions64xyLow']);
+        attributeManager.remove(['instancePositions64xyLow']);
       }
     }
   }
@@ -115,7 +108,7 @@ export default class PathLayer extends Layer {
       if (this.state.model) {
         this.state.model.delete();
       }
-      this.setState({model: this._getModel(gl)});
+      this.setState({model: this._getModel(gl), needsUpdatePositions: true});
     }
     this.updateAttribute({props, oldProps, changeFlags});
 
@@ -127,10 +120,44 @@ export default class PathLayer extends Layer {
     if (geometryChanged) {
       // this.state.paths only stores point positions in each path
       const paths = props.data.map(getPath);
-      const numInstances = paths.reduce((count, path) => count + path.length - 1, 0);
+      const numInstances = paths.reduce((count, path) => count + path.length + 1, 0);
 
-      this.setState({paths, numInstances});
+      this.setState({paths, numInstances, needsUpdatePositions: true});
       attributeManager.invalidateAll();
+    }
+  }
+
+  updateAttributes(props) {
+    const attributeManager = this.getAttributeManager();
+    if (!attributeManager) {
+      return;
+    }
+    super.updateAttributes(props);
+
+    if (this.state.needsUpdatePositions) {
+      const positionAttribute = attributeManager.getAttributes()['instancePositions'];
+      const positionLowAttribute = attributeManager.getAttributes()['instancePositions64xyLow'];
+
+      const positionAttributes = {
+        // offset is 1 vertex * 3 floats * 4 bytes per float
+        instanceLeftPositions: positionAttribute,
+        instanceStartPositions: Object.assign({}, positionAttribute, {offset: 12}),
+        instanceEndPositions: Object.assign({}, positionAttribute, {offset: 12 * 2}),
+        instanceRightPositions: Object.assign({}, positionAttribute, {offset: 12 * 3})
+      };
+
+      if (positionLowAttribute) {
+        Object.assign(positionAttributes, {
+          // offset is 1 vertex * 2 floats * 4 bytes per float
+          instanceLeftPositions64xyLow: positionLowAttribute,
+          instanceStartPositions64xyLow: Object.assign({}, positionLowAttribute, {offset: 8}),
+          instanceEndPositions64xyLow: Object.assign({}, positionLowAttribute, {offset: 8 * 2}),
+          instanceRightPositions64xyLow: Object.assign({}, positionLowAttribute, {offset: 8 * 3})
+        });
+      }
+
+      this.state.model.setAttributes(positionAttributes);
+      this.setState({needsUpdatePositions: false});
     }
   }
 
@@ -144,7 +171,11 @@ export default class PathLayer extends Layer {
       dashJustified
     } = this.props;
 
-    this.state.model.render(
+    const {model} = this.state;
+
+    model.setInstanceCount(this.state.numInstances - 3);
+
+    model.render(
       Object.assign({}, uniforms, {
         jointType: Number(rounded),
         alignMode: Number(dashJustified),
@@ -237,105 +268,73 @@ export default class PathLayer extends Layer {
     );
   }
 
-  calculateStartPositions(attribute) {
-    const {paths} = this.state;
-    const {value} = attribute;
+  _forEachVertex(visitor) {
+    this.state.paths.forEach(path => {
+      const len = path.length;
+      const closed = isClosed(path);
 
-    let i = 0;
-    paths.forEach(path => {
-      const numSegments = path.length - 1;
-      for (let ptIndex = 0; ptIndex < numSegments; ptIndex++) {
-        const point = path[ptIndex];
-        value[i++] = point[0];
-        value[i++] = point[1];
-        value[i++] = point[2] || 0;
-      }
-    });
-  }
-
-  calculateEndPositions(attribute) {
-    const {paths} = this.state;
-    const {value} = attribute;
-
-    let i = 0;
-    paths.forEach(path => {
-      for (let ptIndex = 1; ptIndex < path.length; ptIndex++) {
-        const point = path[ptIndex];
-        value[i++] = point[0];
-        value[i++] = point[1];
-        value[i++] = point[2] || 0;
-      }
-    });
-  }
-
-  calculateInstanceStartEndPositions64xyLow(attribute) {
-    const {paths} = this.state;
-    const {value} = attribute;
-
-    let i = 0;
-    paths.forEach(path => {
-      const numSegments = path.length - 1;
-      for (let ptIndex = 0; ptIndex < numSegments; ptIndex++) {
-        const startPoint = path[ptIndex];
-        const endPoint = path[ptIndex + 1];
-        value[i++] = fp64LowPart(startPoint[0]);
-        value[i++] = fp64LowPart(startPoint[1]);
-        value[i++] = fp64LowPart(endPoint[0]);
-        value[i++] = fp64LowPart(endPoint[1]);
-      }
-    });
-  }
-
-  calculateLeftDeltas(attribute) {
-    const {paths} = this.state;
-    const {value} = attribute;
-
-    let i = 0;
-    paths.forEach(path => {
-      const numSegments = path.length - 1;
-      let prevPoint = isClosed(path) ? path[path.length - 2] : path[0];
-
-      for (let ptIndex = 0; ptIndex < numSegments; ptIndex++) {
-        const point = path[ptIndex];
-        value[i++] = point[0] - prevPoint[0];
-        value[i++] = point[1] - prevPoint[1];
-        value[i++] = point[2] - prevPoint[2] || 0;
-        prevPoint = point;
-      }
-    });
-  }
-
-  calculateRightDeltas(attribute) {
-    const {paths} = this.state;
-    const {value} = attribute;
-
-    let i = 0;
-    paths.forEach(path => {
-      for (let ptIndex = 1; ptIndex < path.length; ptIndex++) {
-        const point = path[ptIndex];
-        let nextPoint = path[ptIndex + 1];
-        if (!nextPoint) {
-          nextPoint = isClosed(path) ? path[1] : point;
+      for (let ptIndex = -1; ptIndex <= len; ptIndex++) {
+        let point;
+        if (ptIndex === -1) {
+          // point to the left of the first vertex
+          point = closed ? path[len - 2] : path[0];
+        } else if (ptIndex === len) {
+          // point to the right of the last vertex
+          point = closed ? path[1] : path[len - 1];
+        } else {
+          point = path[ptIndex];
         }
 
-        value[i++] = nextPoint[0] - point[0];
-        value[i++] = nextPoint[1] - point[1];
-        value[i++] = nextPoint[2] - point[2] || 0;
+       visitor(point);
       }
+    });
+  }
+
+  calculateDiscardFlags(attribute) {
+    const {paths} = this.state;
+    const {value} = attribute;
+
+    let i = 0;
+    paths.forEach((path, index) => {
+      i += path.length + 2;
+      value[i - 3] = 1;
+      value[i - 2] = 1;
+      value[i - 1] = 1;
+    });
+  }
+
+  calculatePositions(attribute) {
+    const {value} = attribute;
+
+    let i = 0;
+    this._forEachVertex(point => {
+      value[i++] = point[0];
+      value[i++] = point[1];
+      value[i++] = point[2] || 0;
+    });
+  }
+
+  calculatePositions64xyLow(attribute) {
+    const {value} = attribute;
+
+    let i = 0;
+    this._forEachVertex(point => {
+      value[i++] = fp64LowPart(point[0]);
+      value[i++] = fp64LowPart(point[1]);
     });
   }
 
   calculateStrokeWidths(attribute) {
     const {data, getWidth} = this.props;
     const {paths} = this.state;
-    const {value} = attribute;
+    const {value, size} = attribute;
 
     let i = 0;
     paths.forEach((path, index) => {
       const width = getWidth(data[index], index);
-      for (let ptIndex = 1; ptIndex < path.length; ptIndex++) {
-        value[i++] = width;
-      }
+      const count = path.length + 2;
+      fillArray({target: value, source: [width], start: i, count});
+      i += count * size;
     });
   }
 
@@ -346,21 +345,20 @@ export default class PathLayer extends Layer {
     }
 
     const {paths} = this.state;
-    const {value} = attribute;
+    const {value, size} = attribute;
     let i = 0;
     paths.forEach((path, index) => {
       const dashArray = getDashArray(data[index], index);
-      for (let ptIndex = 1; ptIndex < path.length; ptIndex++) {
-        value[i++] = dashArray[0];
-        value[i++] = dashArray[1];
-      }
+      const count = path.length + 2;
+      fillArray({target: value, source: dashArray, start: i, count});
+      i += count * size;
     });
   }
 
   calculateColors(attribute) {
     const {data, getColor} = this.props;
     const {paths} = this.state;
-    const {value} = attribute;
+    const {value, size} = attribute;
 
     let i = 0;
     paths.forEach((path, index) => {
@@ -368,28 +366,23 @@ export default class PathLayer extends Layer {
       if (isNaN(pointColor[3])) {
         pointColor[3] = 255;
       }
-      for (let ptIndex = 1; ptIndex < path.length; ptIndex++) {
-        value[i++] = pointColor[0];
-        value[i++] = pointColor[1];
-        value[i++] = pointColor[2];
-        value[i++] = pointColor[3];
-      }
+      const count = path.length + 2;
+      fillArray({target: value, source: pointColor, start: i, count});
+      i += count * size;
     });
   }
 
   // Override the default picking colors calculation
   calculatePickingColors(attribute) {
     const {paths} = this.state;
-    const {value} = attribute;
+    const {value, size} = attribute;
 
     let i = 0;
     paths.forEach((path, index) => {
       const pickingColor = this.encodePickingColor(index);
-      for (let ptIndex = 1; ptIndex < path.length; ptIndex++) {
-        value[i++] = pickingColor[0];
-        value[i++] = pickingColor[1];
-        value[i++] = pickingColor[2];
-      }
+      const count = path.length + 2;
+      fillArray({target: value, source: pickingColor, start: i, count});
+      i += count * size;
     });
   }
 }

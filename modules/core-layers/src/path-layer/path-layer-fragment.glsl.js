@@ -29,6 +29,7 @@ uniform float jointType;
 uniform float miterLimit;
 uniform float alignMode;
 
+varying float vDiscard;
 varying vec4 vColor;
 varying vec2 vCornerOffset;
 varying float vMiterLength;
@@ -78,6 +79,10 @@ bool dash_isFragInGap() {
 }
 
 void main(void) {
+  if (vDiscard > 0.5) {
+    discard;
+  }
+
   // if joint is rounded, test distance from the corner
   if (jointType > 0.0 && vMiterLength > 0.0 && length(vCornerOffset) > 1.0) {
     // Enable to debug joints

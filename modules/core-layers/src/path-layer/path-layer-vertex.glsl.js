@@ -25,8 +25,9 @@ attribute vec3 positions;
 
 attribute vec3 instanceStartPositions;
 attribute vec3 instanceEndPositions;
-attribute vec3 instanceLeftDeltas;
-attribute vec3 instanceRightDeltas;
+attribute vec3 instanceLeftPositions;
+attribute vec3 instanceRightPositions;
+attribute float instanceDiscardFlags;
 attribute float instanceStrokeWidths;
 attribute vec4 instanceColors;
 attribute vec3 instancePickingColors;
@@ -40,6 +41,7 @@ uniform float miterLimit;
 
 uniform float opacity;
 
+varying float vDiscard;
 varying vec4 vColor;
 varying vec2 vCornerOffset;
 varying float vMiterLength;
@@ -193,6 +195,7 @@ vec3 lineJoin(vec3 prevPoint, vec3 currPoint, vec3 nextPoint) {
 }
 
 void main() {
+  vDiscard = instanceDiscardFlags;
   vColor = vec4(instanceColors.rgb, instanceColors.a * opacity) / 255.;
 
   // Set color to be rendered to picking fbo (also used to check for selection highlight).
@@ -200,13 +203,13 @@ void main() {
 
   float isEnd = positions.x;
 
-  vec3 prevPosition = mix(-instanceLeftDeltas, vec3(0.0), isEnd) + instanceStartPositions;
+  vec3 prevPosition = mix(instanceLeftPositions, instanceStartPositions, isEnd);
   prevPosition = project_position(prevPosition);
 
   vec3 currPosition = mix(instanceStartPositions, instanceEndPositions, isEnd);
   currPosition = project_position(currPosition);
 
-  vec3 nextPosition = mix(vec3(0.0), instanceRightDeltas, isEnd) + instanceEndPositions;
+  vec3 nextPosition = mix(instanceEndPositions, instanceRightPositions, isEnd);
   nextPosition = project_position(nextPosition);
 
   vec3 pos = lineJoin(prevPosition, currPosition, nextPosition);

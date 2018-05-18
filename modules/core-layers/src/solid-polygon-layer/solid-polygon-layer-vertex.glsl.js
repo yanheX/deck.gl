@@ -22,7 +22,7 @@ export default `\
 #define SHADER_NAME solid-polygon-layer-vertex-shader
 
 attribute vec2 vertexPositions;
-attribute float endFlags;
+attribute float discardFlags;
 attribute vec3 positions;
 attribute vec2 positions64xyLow;
 attribute vec3 nextPositions;
@@ -47,7 +47,7 @@ void main(void) {
   if (isSideVertex > 0.5) {
     pos = mix(positions, nextPositions, vertexPositions.x);
     pos64xyLow = mix(positions64xyLow, nextPositions64xyLow, vertexPositions.x);
-    vDiscard = endFlags;
+    vDiscard = discardFlags;
   } else {
     pos = positions;
     pos64xyLow = positions64xyLow;
