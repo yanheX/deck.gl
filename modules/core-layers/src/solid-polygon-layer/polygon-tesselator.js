@@ -64,7 +64,7 @@ export class PolygonTesselator {
     const {attributes, polygons, pointCount} = this;
 
     attributes.positions = attributes.positions || new Float32Array(pointCount * 3);
-    attributes.endFlags = attributes.endFlags || new Float32Array(pointCount);
+    attributes.discardFlags = attributes.discardFlags || new Float32Array(pointCount);
 
     if (fp64) {
       // We only need x, y component
@@ -86,8 +86,8 @@ export class PolygonTesselator {
     return this.attributes.positions64xyLow;
   }
 
-  endFlags() {
-    return this.attributes.endFlags;
+  discardFlags() {
+    return this.attributes.discardFlags;
   }
 
   elevations({key = 'elevations', getElevation = x => 100} = {}) {
@@ -152,18 +152,15 @@ function calculateIndices({polygons, IndexType = Uint32Array}) {
 }
 
 function updatePositions({
-  cache: {positions, positions64xyLow, endFlags},
+  cache: {positions, positions64xyLow, discardFlags},
   polygons,
   extruded,
   fp64
 }) {
   // Flatten out all the vertices of all the sub subPolygons
   let i = 0;
-  let nextI = 0;
-  let startVertex = null;
-
   polygons.forEach((polygon, polygonIndex) => {
-    polygon.forEach((loop) => {
+    polygon.forEach(loop => {
       loop.forEach((vertex, vertexIndex) => {
         // eslint-disable-line
         const x = vertex[0];
@@ -183,7 +180,16 @@ function updatePositions({
         }
         i++;
       });
-      endFlags[i - 1] = 1;
+      /* We are reusing the some buffer for `nextPositions` by offsetting one vertex
+       * to the left. As a result,
+       * the last vertex of each loop overlaps with the first vertex of the next loop.
+       * `discardFlags` is used to mark the end of each loop so we don't draw these
+       * segments:
+        positions      A0 A1 A2 A3 A4 B0 B1 B2 C0 ...
+        nextPositions  A1 A2 A3 A4 B0 B1 B2 C0 C1 ...
+        discardFlags   0  0  0  0  1  0  0  1  0  ...
+       */
+      discardFlags[i - 1] = 1;
     });
   });
 }

@@ -299,7 +299,7 @@ export default class SolidPolygonLayer extends Layer {
       const newAttributes = {};
       for (const attributeName in attributeMap) {
         const attributeOverride = attributeMap[attributeName];
-        const sourceName = attributeOverride && attributeOverride.source || attributeName;
+        const sourceName = (attributeOverride && attributeOverride.source) || attributeName;
         const attribute = attributes[sourceName];
 
         if (attribute) {

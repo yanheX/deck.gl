@@ -135,24 +135,26 @@ export default class PathLayer extends Layer {
     super.updateAttributes(props);
 
     if (this.state.needsUpdatePositions) {
-      const positionAttribute = attributeManager.getAttributes()['instancePositions'];
-      const positionLowAttribute = attributeManager.getAttributes()['instancePositions64xyLow'];
+      const {instancePositions, instancePositions64xyLow} = attributeManager.getAttributes();
 
+      // See comment below on positions and offsets
       const positionAttributes = {
         // offset is 1 vertex * 3 floats * 4 bytes per float
-        instanceLeftPositions: positionAttribute,
-        instanceStartPositions: Object.assign({}, positionAttribute, {offset: 12}),
-        instanceEndPositions: Object.assign({}, positionAttribute, {offset: 12 * 2}),
-        instanceRightPositions: Object.assign({}, positionAttribute, {offset: 12 * 3})
+        instanceLeftPositions: instancePositions,
+        instanceStartPositions: Object.assign({}, instancePositions, {offset: 12}),
+        instanceEndPositions: Object.assign({}, instancePositions, {offset: 12 * 2}),
+        instanceRightPositions: Object.assign({}, instancePositions, {offset: 12 * 3})
       };
 
-      if (positionLowAttribute) {
+      if (instancePositions64xyLow) {
         Object.assign(positionAttributes, {
           // offset is 1 vertex * 2 floats * 4 bytes per float
-          instanceLeftPositions64xyLow: positionLowAttribute,
-          instanceStartPositions64xyLow: Object.assign({}, positionLowAttribute, {offset: 8}),
-          instanceEndPositions64xyLow: Object.assign({}, positionLowAttribute, {offset: 8 * 2}),
-          instanceRightPositions64xyLow: Object.assign({}, positionLowAttribute, {offset: 8 * 3})
+          instanceLeftPositions64xyLow: instancePositions64xyLow,
+          instanceStartPositions64xyLow: Object.assign({}, instancePositions64xyLow, {offset: 8}),
+          instanceEndPositions64xyLow: Object.assign({}, instancePositions64xyLow, {offset: 8 * 2}),
+          instanceRightPositions64xyLow: Object.assign({}, instancePositions64xyLow, {
+            offset: 8 * 3
+          })
         });
       }
 
@@ -268,6 +270,27 @@ export default class PathLayer extends Layer {
     );
   }
 
+  /**
+   * Positions and discardFlags
+   *
+   * For each path, the positions array is constructed as such:
+   * (vertex to the left of v0) v0 v1 v2 ... vn (vertex to the right of vn)
+   * We reuse the some positions buffer for all position attributes by offsetting:
+      instanceLeftPosition  (+0)
+      instanceStartPosition (+1)
+      instanceEndPosition   (+2)
+      instanceRightPosition (+3)
+   *
+   * `discardFlags` is used to mark the end of each path where vertices from the previous
+   * path overlap with vertices from the next path. We shouldn't draw these segments:
+   *
+      instanceLeftPosition    A0 A0 A1 A2 A3 A4 A4 B0 B0 B1 B2 B2 C0 ...
+      instanceStartPosition   A0 A1 A2 A3 A4 A4 B0 B0 B1 B2 B2 C0 C0...
+      instanceEndPosition     A1 A2 A3 A4 A4 B0 B0 B1 B2 B2 C0 C0 C1...
+      instanceRightPosition   A2 A3 A4 A4 B0 B0 B1 B2 B2 C0 C0 C1 C2...
+      discardFlags            0  0  0  0  1  1  1  1  0  1  1  1  0...
+   */
+
   _forEachVertex(visitor) {
     this.state.paths.forEach(path => {
       const len = path.length;
@@ -285,7 +308,7 @@ export default class PathLayer extends Layer {
           point = path[ptIndex];
         }
 
-       visitor(point);
+        visitor(point);
       }
     });
   }
@@ -296,6 +319,7 @@ export default class PathLayer extends Layer {
 
     let i = 0;
     paths.forEach((path, index) => {
+      // Each path has `length - 1` segments and 3 invalid segments due to offsetting
       i += path.length + 2;
       value[i - 3] = 1;
       value[i - 2] = 1;
